@@ -38,3 +38,20 @@ func EntryToResult(e db.Entry) scraper.SearchResult {
 		Url:    e.Url,
 	}
 }
+
+func ResultToQuery(r scraper.SearchResult) db.Query {
+	return db.Query{
+		Query:  r.Title,
+		Artist: r.Artist,
+		Title:  r.Title,
+		Url:    r.Url,
+	}
+}
+
+func QueryToResult(q db.Query) scraper.SearchResult {
+	return scraper.SearchResult{
+		Artist: q.Artist,
+		Title:  q.Title,
+		Url:    q.Url,
+	}
+}
