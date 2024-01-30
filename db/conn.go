@@ -38,5 +38,10 @@ func prepDb(db *sql.DB) error {
 		return err
 	}
 
+	_, err = db.Exec("CREATE TABLE IF NOT EXISTS queries (id INTEGER PRIMARY KEY, query TEXT, url TEXT)")
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
