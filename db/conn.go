@@ -4,6 +4,7 @@ import (
 	"database/sql"
 
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/newtoallofthis123/lyrics_go/files"
 )
 
 type DbConnection struct {
@@ -11,7 +12,7 @@ type DbConnection struct {
 }
 
 func GetDbConnection() (*DbConnection, error) {
-	db, err := sql.Open("sqlite3", "./lyrics.db")
+	db, err := sql.Open("sqlite3", files.GetDbPath())
 	if err != nil {
 		return nil, err
 	}
@@ -39,6 +40,11 @@ func prepDb(db *sql.DB) error {
 	}
 
 	_, err = db.Exec("CREATE TABLE IF NOT EXISTS queries (id INTEGER PRIMARY KEY, query TEXT, artist TEXT, title TEXT, url TEXT)")
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, url TEXT, used INTEGER)")
 	if err != nil {
 		return err
 	}

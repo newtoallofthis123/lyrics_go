@@ -9,12 +9,13 @@ import (
 
 func GetSpinner() *yacspin.Spinner {
 	cfg := yacspin.Config{
-		Frequency:       100 * time.Millisecond,
-		CharSet:         yacspin.CharSets[9],
-		SuffixAutoColon: true,
-		StopCharacter:   "✓ ",
-		StopFailMessage: "Failed!",
-		StopColors:      []string{"fgGreen"},
+		Frequency:         100 * time.Millisecond,
+		CharSet:           yacspin.CharSets[9],
+		SuffixAutoColon:   true,
+		StopCharacter:     "✓ ",
+		StopFailCharacter: "✗ ",
+		StopFailMessage:   "Failed!",
+		StopColors:        []string{"fgGreen"},
 	}
 
 	spinner, err := yacspin.New(cfg)

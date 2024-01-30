@@ -12,6 +12,14 @@ type Entry struct {
 	Url    string
 }
 
+type Query struct {
+	Id     int
+	Query  string
+	Artist string
+	Title  string
+	Url    string
+}
+
 func (sqlite3 *DbConnection) InsertEntry(e Entry) error {
 	sql, args, err := sq.Insert("lyrics").Columns("artist", "title", "lyrics", "url").Values(e.Artist, e.Title, e.Lyrics, e.Url).ToSql()
 	if err != nil {
@@ -22,8 +30,8 @@ func (sqlite3 *DbConnection) InsertEntry(e Entry) error {
 	return err
 }
 
-func (sqlite3 *DbConnection) InsertQuery(query string, e Entry) error {
-	sql, args, err := sq.Insert("queries").Columns("query", "artist", "title", "url").Values(query, e.Artist, e.Title, e.Url).ToSql()
+func (sqlite3 *DbConnection) InsertQuery(query string, q Query) error {
+	sql, args, err := sq.Insert("queries").Columns("query", "artist", "title", "url").Values(query, q.Artist, q.Title, q.Url).ToSql()
 	if err != nil {
 		return err
 	}
@@ -32,56 +40,82 @@ func (sqlite3 *DbConnection) InsertQuery(query string, e Entry) error {
 	return err
 }
 
-func (sqlite3 *DbConnection) GetByQuery(query string) ([]Entry, error) {
-	var entries []Entry
+func (sqlite3 *DbConnection) GetByQuery(query string) ([]Query, error) {
+	var queries []Query
 
-	sql, args, err := sq.Select("id", "artist", "title", "lyrics", "url").From("queries").Where(sq.Like{"query": query}).ToSql()
+	sql, args, err := sq.Select("id", "artist", "title", "url").From("queries").Where(sq.Like{"query": query}).ToSql()
 	if err != nil {
-		return entries, err
+		return queries, err
 	}
 
 	rows, err := sqlite3.db.Query(sql, args...)
 	if err != nil {
-		return entries, err
+		return queries, err
 	}
 
 	for rows.Next() {
-		var e Entry
-		err = rows.Scan(&e.Id, &e.Artist, &e.Title, &e.Lyrics, &e.Url)
+		var q Query
+		err = rows.Scan(&q.Id, &q.Artist, &q.Title, &q.Url)
 		if err != nil {
-			return entries, err
+			return queries, err
 		}
 
-		entries = append(entries, e)
+		queries = append(queries, q)
 	}
 
-	return entries, nil
+	return queries, nil
 }
 
-func (sqlite3 *DbConnection) GetAllQueries() ([]Entry, error) {
-	var entries []Entry
+func (sqlite3 *DbConnection) GetAllQueries() ([]Query, error) {
+	var queries []Query
 
-	sql, args, err := sq.Select("id", "artist", "title", "lyrics", "url").From("queries").ToSql()
+	sql, args, err := sq.Select("id", "artist", "title", "url").From("queries").ToSql()
 	if err != nil {
-		return entries, err
+		return queries, err
 	}
 
 	rows, err := sqlite3.db.Query(sql, args...)
 	if err != nil {
-		return entries, err
+		return queries, err
 	}
 
 	for rows.Next() {
-		var e Entry
-		err = rows.Scan(&e.Id, &e.Artist, &e.Title, &e.Lyrics, &e.Url)
+		var q Query
+		err = rows.Scan(&q.Id, &q.Artist, &q.Title, &q.Url)
 		if err != nil {
-			return entries, err
+			return queries, err
 		}
 
-		entries = append(entries, e)
+		queries = append(queries, q)
 	}
 
-	return entries, nil
+	return queries, nil
+}
+
+func (sqlite3 *DbConnection) GetAllOnlyQueries() ([]string, error) {
+	var queries []string
+
+	sql, args, err := sq.Select("query").From("queries").ToSql()
+	if err != nil {
+		return queries, err
+	}
+
+	rows, err := sqlite3.db.Query(sql, args...)
+	if err != nil {
+		return queries, err
+	}
+
+	for rows.Next() {
+		var q string
+		err = rows.Scan(&q)
+		if err != nil {
+			return queries, err
+		}
+
+		queries = append(queries, q)
+	}
+
+	return queries, nil
 }
 
 func (sqlite3 *DbConnection) GetEntryByUrl(url string) (Entry, error) {
