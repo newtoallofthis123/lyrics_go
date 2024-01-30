@@ -97,7 +97,10 @@ func (sr *SearchResult) GetSongLyrics() (Lyrics, error) {
 	var lyrics string
 
 	doc.Find("#lyrics").Each(func(i int, s *goquery.Selection) {
-		lyrics = s.Text()
+		lyrics, err = s.Html()
+		if err != nil {
+			panic(err)
+		}
 	})
 
 	return Lyrics{

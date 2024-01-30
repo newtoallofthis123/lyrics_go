@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/hbollon/go-edlib"
 	"github.com/newtoallofthis123/lyrics_go/cli"
 	"github.com/newtoallofthis123/lyrics_go/db"
 	"github.com/newtoallofthis123/lyrics_go/scraper"
@@ -28,39 +29,59 @@ func main() {
 		panic(err)
 	}
 
-	entries, err := dbConn.GetAllEntries()
+	queries, err := dbConn.GetAllQueries()
 	if err != nil {
 		panic(err)
 	}
 
+	if len(queries) > 0 {
+		var texts []string
+		for _, v := range queries {
+			texts = append(texts, v.Title)
+		}
+
+		similar, err := edlib.FuzzySearch(query, texts, edlib.Levenshtein)
+		if err == nil {
+			query = similar
+		}
+	}
+
 	s := cli.GetSpinner()
-	var results []db.Entry
+	var result db.Entry
 
-	existing, ok := utils.FindExisting(entries, query)
-	if ok {
-		results = append(results, existing...)
+	var instance string
 
-		fmt.Println(results)
+	s.Message("Searching...")
+	s.Start()
+
+	var searchResults []scraper.SearchResult
+
+	existingQueries, err := dbConn.GetByQuery(query)
+
+	fmt.Println(existingQueries)
+
+	if err == nil && len(existingQueries) > 0 {
+		searchResults = make([]scraper.SearchResult, len(existingQueries))
+		for i, v := range existingQueries {
+			searchResults[i] = EntryToResult(v)
+		}
 	} else {
 		fmt.Println(chalk.Yellow, "Cache Miss, Scraping...", chalk.Reset)
 
 		s.Message("Acquiring Instance...")
 		s.Start()
-		instance, err := utils.GetInstance()
+		instance, err = utils.GetInstance()
 		if err != nil {
 			panic(err)
 		}
 		s.StopMessage(fmt.Sprintf("Acquired Instance: %s", instance))
 		s.Stop()
 
-		s.Message("Searching...")
 		request := scraper.GetLyrics{
 			Instance: instance,
 			Query:    query,
 		}
-
-		s.Start()
-		searchResults, err := request.ParseSearchPage()
+		searchResults, err = request.ParseSearchPage()
 		if err != nil {
 			s.StopFail()
 			panic(err)
@@ -69,47 +90,51 @@ func main() {
 			s.StopFail()
 			panic("No Results Found")
 		}
-
-		s.StopMessage("Search Complete")
-		s.Stop()
-
-		var options []string
-		for _, v := range searchResults {
-			options = append(options, fmt.Sprintf("%s - %s", v.Title, v.Artist))
-		}
-
-		userChoice := cli.GetOptions(options)
-
-		var choice scraper.SearchResult
-		for _, v := range searchResults {
-			if userChoice == fmt.Sprintf("%s - %s", v.Title, v.Artist) {
-				choice = v
-			}
-		}
-
-		s.Message("Getting Lyrics...")
-		s.Start()
-		lyrics, err := choice.GetSongLyrics()
-		if err != nil {
-			s.StopFail()
-			panic(err)
-		}
-		s.StopMessage("Lyrics Acquired")
-		s.Stop()
-
-		if lyrics.Lyrics == "" {
-			s.StopFail()
-			panic("No Lyrics Found, Try Again")
-		}
-
-		s.Message("Inserting Into Cache...")
-		s.Start()
-		err = dbConn.InsertEntry(LyricsToEntry(lyrics))
-		if err != nil {
-			s.StopFail()
-			panic(err)
-		}
-		s.StopMessage("Inserted Into Cache")
-		s.Stop()
 	}
+
+	s.StopMessage(fmt.Sprintf("Found %d Results", len(searchResults)))
+	s.Stop()
+
+	var options []string
+	for _, v := range searchResults {
+		err := dbConn.InsertQuery(query, ResultToEntry(v))
+		if err != nil {
+			panic(err)
+		}
+		options = append(options, fmt.Sprintf("%s - %s", v.Title, v.Artist))
+	}
+
+	userChoice := cli.GetOptions(options)
+
+	var choice scraper.SearchResult
+	for _, v := range searchResults {
+		if userChoice == fmt.Sprintf("%s - %s", v.Title, v.Artist) {
+			choice = v
+		}
+	}
+
+	s.Message("Getting Lyrics...")
+	s.Start()
+	lyrics, err := choice.GetSongLyrics()
+	if err != nil {
+		s.StopFail()
+		panic(err)
+	}
+	s.StopMessage("Lyrics Acquired")
+	s.Stop()
+
+	if lyrics.Lyrics == "" {
+		s.StopFail()
+		panic("No Lyrics Found, Try Again")
+	}
+
+	s.Message("Inserting Into Cache...")
+	s.Start()
+	err = dbConn.InsertEntry(LyricsToEntry(lyrics))
+	if err != nil {
+		s.StopFail()
+		panic(err)
+	}
+
+	fmt.Println(result)
 }

@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"time"
 
+	md "github.com/JohannesKaufmann/html-to-markdown"
 	"github.com/hbollon/go-edlib"
 	"github.com/newtoallofthis123/lyrics_go/db"
 )
@@ -12,16 +14,26 @@ import (
 const FARSIDE_LINK = "https://farside.link/dumb"
 
 func GetInstance() (string, error) {
-	client := http.Client{}
+	for {
+		client := http.Client{}
 
-	resp, err := client.Get(FARSIDE_LINK)
-	if err != nil {
-		return "", err
+		resp, err := client.Get(FARSIDE_LINK)
+		if err != nil {
+			time.Sleep(5 * time.Millisecond)
+			continue
+		}
+
+		defer resp.Body.Close()
+
+		// test by sending a request to the instance
+		_, err = client.Get(fmt.Sprintf("%s/search?q=%s", resp.Request.URL.String(), "test"))
+		if err != nil {
+			time.Sleep(5 * time.Millisecond) // Wait before retrying
+			continue
+		}
+
+		return resp.Request.URL.String(), nil
 	}
-
-	defer resp.Body.Close()
-
-	return resp.Request.URL.String(), nil
 }
 
 func ConvertToQuery(query string) string {
@@ -47,32 +59,33 @@ func SearchableEntires(e []db.Entry, readable bool) (map[string]string, []string
 	return entries, texts
 }
 
-func FindExisting(entries []db.Entry, query string) ([]db.Entry, bool) {
+func FindExisting(entries []db.Entry, query string) (db.Entry, bool) {
 	searchable, options := SearchableEntires(entries, false)
 
-	similar, err := edlib.FuzzySearchSetThreshold(query, options, 3, 0.2, edlib.Levenshtein)
+	similar, err := edlib.FuzzySearchThreshold(query, options, 0.2, edlib.Levenshtein)
 	if err != nil {
 		panic(err)
 	}
 
 	if len(similar) == 0 {
-		return nil, false
+		return db.Entry{}, false
 	}
 
-	var results []db.Entry
+	entry := searchable[similar]
+	if entry == "" {
+		return db.Entry{}, false
+	}
 
-	for _, v := range similar {
-		entry := searchable[v]
-		for _, e := range entries {
-			if e.Url == entry {
-				results = append(results, e)
-			}
+	for _, v := range entries {
+		if v.Url == entry {
+			return v, true
 		}
 	}
 
-	if len(results) == 0 {
-		return nil, false
-	}
+	return db.Entry{}, false
+}
 
-	return results, true
+func ConvertHTMLToMarkdown(html string) (string, error) {
+	converter := md.NewConverter("", true, nil)
+	return converter.ConvertString(html)
 }
